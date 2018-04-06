@@ -71,11 +71,11 @@ class ViewsBulkOperationsBulkForm extends FieldPluginBase implements CacheableDe
   protected $currentUser;
 
   /**
-   * The current URL object.
+   * The request stack.
    *
-   * @var \Drupal\Core\Url
+   * @var \Symfony\Component\HttpFoundation\RequestStack
    */
-  protected $url;
+  protected $requestStack;
 
   /**
    * An array of actions that can be executed.
@@ -141,7 +141,7 @@ class ViewsBulkOperationsBulkForm extends FieldPluginBase implements CacheableDe
     $this->actionProcessor = $actionProcessor;
     $this->tempStoreFactory = $tempStoreFactory;
     $this->currentUser = $currentUser;
-    $this->url = Url::createFromRequest($requestStack->getCurrentRequest());
+    $this->requestStack = $requestStack;
   }
 
   /**
@@ -212,7 +212,7 @@ class ViewsBulkOperationsBulkForm extends FieldPluginBase implements CacheableDe
       'batch_size' => $this->options['batch'] ? $this->options['batch_size'] : 0,
       'total_results' => $this->viewData->getTotalResults(),
       'arguments' => $this->view->args,
-      'redirect_url' => $this->url,
+      'redirect_url' => Url::createFromRequest($this->requestStack->getCurrentRequest()),
       'exposed_input' => $this->view->getExposedInput(),
     ];
 
@@ -540,7 +540,6 @@ class ViewsBulkOperationsBulkForm extends FieldPluginBase implements CacheableDe
       // Update tempstore data.
       $this->updateTempstoreData();
 
-      $use_revision = array_key_exists('revision', $this->view->getQuery()->getEntityTableInfo());
       $form[$this->options['id']]['#tree'] = TRUE;
 
       // Get pager data if available.
@@ -763,10 +762,14 @@ class ViewsBulkOperationsBulkForm extends FieldPluginBase implements CacheableDe
       $this->tempStoreData['preconfiguration'] = isset($this->options['preconfiguration'][$action_id]) ? $this->options['preconfiguration'][$action_id] : [];
 
       if (!$form_state->getValue('select_all')) {
-        // Update list data with the form selection.
+
+        // Update list data with the current form selection.
         foreach ($form_state->getValue($this->options['id']) as $row_index => $bulkFormKey) {
           if ($bulkFormKey) {
             $this->tempStoreData['list'][$bulkFormKey] = $this->getListItem($bulkFormKey, $form[$this->options['id']][$row_index]['#title']);
+          }
+          else {
+            unset($this->tempStoreData['list'][$form[$this->options['id']][$row_index]['#return_value']]);
           }
         }
       }
